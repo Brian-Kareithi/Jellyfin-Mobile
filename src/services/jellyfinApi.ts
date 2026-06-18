@@ -21,10 +21,39 @@ class JellyfinApi {
     });
   }
 
-  async testConnection(serverUrl: string): Promise<SystemInfo> {
-    this.initialize(serverUrl);
-    const response = await this.api!.get('/System/Info/Public');
-    return response.data;
+  async testConnection(serverUrl: string): Promise<{ ServerName: string; Version: string }> {
+    const base = serverUrl.replace(/\/$/, '');
+    const url = `${base}/System/Info/Public`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw { status: res.status, statusText: res.statusText, body: text.slice(0, 500) };
+      }
+
+      const data = await res.json();
+      this.initialize(serverUrl);
+      return data;
+    } catch (e: any) {
+      clearTimeout(timeout);
+      if (e?.status) throw e;
+      if (e?.name === 'AbortError') throw { message: 'Request timed out after 10 seconds' };
+      if (e?.message?.includes('network') || e?.message?.includes('NETWORK')) {
+        throw { message: e.message, type: 'network' };
+      }
+      throw { message: e?.message || 'Unknown error', type: 'unknown' };
+    }
   }
 
   async getServerInfo(): Promise<SystemInfo> {

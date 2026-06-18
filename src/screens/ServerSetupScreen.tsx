@@ -45,18 +45,21 @@ export default function ServerSetupScreen() {
         `Connected to ${info.ServerName} (v${info.Version})`,
         [{ text: 'Continue', onPress: () => router.replace('/login') }]
       );
-    } catch (error: any) {
-      const status = error?.response?.status;
-      const detail = error?.response?.data?.Message || error?.message || '';
-      let message = `Could not connect to ${url}.`;
-      if (status === 401) {
-        message = `Server requires authentication. Try adding /System/Info/Public to verify connectivity.`;
-      } else if (detail.includes('Network') || detail.includes('ENOTFOUND') || detail.includes('ECONNREFUSED') || detail.includes('ERR_NAME_NOT_RESOLVED')) {
-        message = `Cannot reach the server. Check the URL and ensure:\n\n1. The server is running\n2. The URL is correct (try the IP address)\n3. You are on the same network or VPN\n\nDetail: ${detail}`;
-      } else if (status) {
-        message = `Server responded with status ${status}. ${detail}`;
+    } catch (e: any) {
+      let parts = [`Failed to connect to ${url}\n`];
+      if (e.status) {
+        parts.push(`HTTP ${e.status} ${e.statusText}`);
+        if (e.body) parts.push(`\nResponse: ${e.body}`);
+      } else if (e.type === 'network') {
+        parts.push('Cannot reach the server.\n');
+        parts.push('Check:\n1. Server is running\n2. Correct hostname/IP\n3. Correct port\n4. Connected to network/VPN');
+        parts.push(`\nDetail: ${e.message}`);
+      } else if (e.message?.includes('timed out')) {
+        parts.push('Request timed out after 10 seconds.\nServer is not responding.');
+      } else {
+        parts.push(`${e.message || 'Unknown error'}`);
       }
-      Alert.alert('Connection Failed', message);
+      Alert.alert('Connection Failed', parts.join('\n'));
     } finally {
       setLoading(false);
     }
