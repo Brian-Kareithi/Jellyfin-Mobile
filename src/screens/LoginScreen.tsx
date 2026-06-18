@@ -39,9 +39,20 @@ export default function LoginScreen() {
       setUser(response.User);
       router.replace('/home');
     } catch (error: any) {
-      const message = error.response?.status === 401
-        ? 'Invalid username or password'
-        : error.message || 'Login failed. Please check your credentials.';
+      const status = error?.status || error?.response?.status;
+      const body = error?.body || error?.response?.data?.Message || '';
+      const url = error?.url || serverUrl;
+
+      let message: string;
+      if (status === 401) {
+        message = 'Invalid username or password';
+      } else if (status === 404) {
+        message = `URL not found.\n\nThe server returned 404 at:\n${url}\n\nCheck that:\n1. The URL is correct (including any subpath like /jellyfin)\n2. The server version supports this endpoint`;
+      } else {
+        message = `${error?.message || error || 'Login failed'}`;
+        if (status) message += ` (HTTP ${status})`;
+        if (body) message += `\n\nServer response: ${body.substring(0, 300)}`;
+      }
       Alert.alert('Login Failed', message);
     } finally {
       setLoading(false);
