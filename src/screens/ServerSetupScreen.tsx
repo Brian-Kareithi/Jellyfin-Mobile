@@ -6,17 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../store/authStore';
-import { jellyfinApi } from '../services/jellyfinApi';
 
 export default function ServerSetupScreen() {
   const [serverUrl, setServerUrl] = useState('');
-  const [loading, setLoading] = useState(false);
   const { setServerUrl: saveServerUrl } = useAuthStore();
   const router = useRouter();
 
@@ -29,40 +26,14 @@ export default function ServerSetupScreen() {
     return url;
   };
 
-  const handleConnect = async () => {
+  const handleConnect = () => {
     const url = normalizeUrl(serverUrl);
     if (!url) {
       Alert.alert('Error', 'Please enter a server URL');
       return;
     }
-
-    setLoading(true);
-    try {
-      const info = await jellyfinApi.testConnection(url);
-      saveServerUrl(url);
-      Alert.alert(
-        'Connected',
-        `Connected to ${info.ServerName} (v${info.Version})`,
-        [{ text: 'Continue', onPress: () => router.replace('/login') }]
-      );
-    } catch (e: any) {
-      let parts = [`Failed to connect to ${url}\n`];
-      if (e.status) {
-        parts.push(`HTTP ${e.status} ${e.statusText}`);
-        if (e.body) parts.push(`\nResponse: ${e.body}`);
-      } else if (e.type === 'network') {
-        parts.push('Cannot reach the server.\n');
-        parts.push('Check:\n1. Server is running\n2. Correct hostname/IP\n3. Correct port\n4. Connected to network/VPN');
-        parts.push(`\nDetail: ${e.message}`);
-      } else if (e.message?.includes('timed out')) {
-        parts.push('Request timed out after 10 seconds.\nServer is not responding.');
-      } else {
-        parts.push(`${e.message || 'Unknown error'}`);
-      }
-      Alert.alert('Connection Failed', parts.join('\n'));
-    } finally {
-      setLoading(false);
-    }
+    saveServerUrl(url);
+    router.replace('/login');
   };
 
   return (
@@ -88,15 +59,10 @@ export default function ServerSetupScreen() {
         />
 
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={styles.button}
           onPress={handleConnect}
-          disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Connect</Text>
-          )}
+          <Text style={styles.buttonText}>Connect</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

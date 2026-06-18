@@ -23,34 +23,31 @@ class JellyfinApi {
 
   async testConnection(serverUrl: string): Promise<{ ServerName: string; Version: string }> {
     const base = serverUrl.replace(/\/$/, '');
-    const url = `${base}/System/Info/Public`;
+    const TIMEOUT_MS = 10000;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const fetchWithTimeout = (url: string, timeoutMs: number) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeoutMs);
+      return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+    };
 
     try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw { status: res.status, statusText: res.statusText, body: text.slice(0, 500) };
+      const res = await fetchWithTimeout(base, TIMEOUT_MS);
+      if (!res.ok && res.status !== 404 && res.status !== 401) {
+        throw { status: res.status, statusText: res.statusText };
       }
-
-      const data = await res.json();
       this.initialize(serverUrl);
-      return data;
+      return { ServerName: 'Jellyfin Server', Version: '' };
     } catch (e: any) {
-      clearTimeout(timeout);
-      if (e?.status) throw e;
-      if (e?.name === 'AbortError') throw { message: 'Request timed out after 10 seconds' };
-      if (e?.message?.includes('network') || e?.message?.includes('NETWORK')) {
-        throw { message: e.message, type: 'network' };
+      if (e?.status) {
+        throw { message: `Server responded with HTTP ${e.status}. Proceeding to login...`, type: 'warn' };
+      }
+      if (e?.name === 'AbortError') {
+        throw { message: `Timed out connecting to ${base}.\n\nIf the original Jellyfin app works, try entering the EXACT same URL you use there (including port number).\n\nIf behind Tailscale, ensure:\n- Tailscale is connected\n- Use the Tailscale IP (100.x.x.x:8096) or MagicDNS name` };
+      }
+      const msg = (e?.message || '').toLowerCase();
+      if (msg.includes('network') || msg.includes('dns') || msg.includes('enotfound') || msg.includes('econnrefused') || msg.includes('err_name') || msg.includes('fetch')) {
+        throw { message: `Cannot reach ${base}.\nCheck:\n1. Server is running\n2. Correct URL (try the IP address)\n3. Port is open\n4. Network/VPN is connected\n\nDetail: ${e.message}`, type: 'network' };
       }
       throw { message: e?.message || 'Unknown error', type: 'unknown' };
     }
