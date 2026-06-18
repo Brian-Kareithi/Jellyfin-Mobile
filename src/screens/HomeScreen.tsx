@@ -72,8 +72,11 @@ export default function HomeScreen() {
       ]);
       setContinueWatching(continueData);
       setLibraries(libs);
-    } catch (error) {
-      console.error('Error loading home data:', error);
+    } catch (error: any) {
+      const status = error?.status || '';
+      const body = error?.body || '';
+      const url = error?.url || '';
+      console.error('Home data error:', status, url, body.slice(0, 500));
     }
   }, []);
 

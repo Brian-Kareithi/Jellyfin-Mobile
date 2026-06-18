@@ -34,9 +34,9 @@ class JellyfinApi {
 
     const headers: Record<string, string> = {
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
       'Authorization': this.buildAuthHeader(useToken ? this.accessToken : undefined),
     };
+    if (body) headers['Content-Type'] = 'application/json';
 
     const res = await fetch(url, {
       method,
@@ -44,13 +44,20 @@ class JellyfinApi {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    if (!res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+
+    if (!res.ok || !contentType.includes('json')) {
       const text = await res.text().catch(() => '');
-      const err: any = new Error(`Request failed with status ${res.status}`);
+      const err: any = new Error(
+        !res.ok
+          ? `Request failed with status ${res.status}`
+          : `Expected JSON but got ${contentType || 'unknown'}`
+      );
       err.status = res.status;
       err.statusText = res.statusText;
       err.body = text;
       err.url = url;
+      err.contentType = contentType;
       throw err;
     }
 
